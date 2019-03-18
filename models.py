@@ -86,7 +86,11 @@ class RNN(nn.Module): # Implement a stacked vanilla RNN with Tanh nonlinearities
     self.linear = nn.Linear(hidden_size, vocab_size)
     
     self.tanh = torch.nn.Tanh()
-    
+    if torch.cuda.is_available():
+        self.device = torch.device("cuda") 
+    else:
+        self.device = torch.device("cpu")
+
     self.init_weights()
     
   def init_weights(self):
@@ -97,12 +101,13 @@ class RNN(nn.Module): # Implement a stacked vanilla RNN with Tanh nonlinearities
     # in the range [-k, k] where k is the square root of 1/hidden_size
     k = math.sqrt(1/self.hidden_size)
     
-    self.Wx = torch.rand(self.emb_size, self.hidden_size) * 2 * k - k
-    self.Wh = torch.rand(self.hidden_size, self.hidden_size) * 2 * k - k
-    self.Wy = torch.rand(self.hidden_size, self.vocab_size) * 2 * k - k
+    self.Wx = torch.rand(self.emb_size, self.hidden_size, device=self.device) * 2 * k - k
+    self.Wh = torch.rand(self.hidden_size, self.hidden_size, device=self.device) * 2 * k - k
+    self.Wy = torch.rand(self.hidden_size, self.vocab_size, device=self.device) * 2 * k - k
     
-    self.bh = torch.rand(1, self.hidden_size) * 2 * k - k
-    self.by = torch.rand(1, self.vocab_size) * 2 * k - k
+    self.bh = torch.rand(1, self.hidden_size, device=self.device) * 2 * k - k
+    self.by = torch.rand(1, self.vocab_size, device=self.device) * 2 * k - k
+
 
   def init_hidden(self):
     # TODO ========================
@@ -110,7 +115,7 @@ class RNN(nn.Module): # Implement a stacked vanilla RNN with Tanh nonlinearities
     """
     This is used for the first mini-batch in an epoch, only.
     """
-    hx = Variable(torch.zeros(self.num_layers, self.batch_size, self.hidden_size), requires_grad=True)
+    hx = Variable(torch.zeros(self.num_layers, self.batch_size, self.hidden_size), requires_grad=True).cuda()
     return hx
 
   def step(self, x, h=None):
@@ -152,9 +157,9 @@ class RNN(nn.Module): # Implement a stacked vanilla RNN with Tanh nonlinearities
               if you are curious.
                     shape: (num_layers, batch_size, hidden_size)
     """
-    outputs = Variable(torch.zeros(0, self.batch_size, self.vocab_size), requires_grad=True)
+    outputs = Variable(torch.zeros(0, self.batch_size, self.vocab_size), requires_grad=True).cuda()
 #    hidden_new = hidden
-    hidden_new = copy.deepcopy(hidden)
+    hidden_new = copy.deepcopy(hidden).cuda()
     for i in range(self.seq_len):
         x = self.wb.forward(inputs[i])
         x = self.dropout.forward(x)
@@ -243,7 +248,7 @@ class GRU(nn.Module): # Implement a stacked GRU RNN
 
   def init_hidden(self):
     # TODO ========================
-    hx = Variable(torch.zeros(self.num_layers, self.batch_size, self.hidden_size), requires_grad=True)
+    hx = Variable(torch.zeros(self.num_layers, self.batch_size, self.hidden_size), requires_grad=True).cuda()
     return hx
 
   def step(self, x, h=None):
@@ -255,9 +260,9 @@ class GRU(nn.Module): # Implement a stacked GRU RNN
 
   def forward(self, inputs, hidden):
     # TODO ========================
-    outputs = Variable(torch.zeros(0, self.batch_size, self.vocab_size), requires_grad=True)
+    outputs = Variable(torch.zeros(0, self.batch_size, self.vocab_size), requires_grad=True).cuda()
 #    hidden_new = hidden
-    hidden_new = copy.deepcopy(hidden)
+    hidden_new = copy.deepcopy(hidden).cuda()
     for i in range(self.seq_len):
         x = self.wb.forward(inputs[i])
         x = self.dropout.forward(x)
@@ -406,7 +411,7 @@ class PositionalEncoding(nn.Module):
         
     def forward(self, x):
         x = x + Variable(self.pe[:, :x.size(1)], 
-                         requires_grad=False)
+                         requires_grad=False).cuda()
         return self.dropout(x)
 
 
