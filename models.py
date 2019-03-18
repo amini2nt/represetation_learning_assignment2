@@ -81,7 +81,7 @@ class RNN(nn.Module): # Implement a stacked vanilla RNN with Tanh nonlinearities
     self.num_layers = num_layers
     self.dp_keep_prob = dp_keep_prob
     
-    self.wb = WordEmbedding(hidden_size, vocab_size)
+    self.wb = WordEmbedding(emb_size, vocab_size)
     self.dropout = nn.Dropout(1 - dp_keep_prob)
     self.linear = nn.Linear(hidden_size, vocab_size)
     
@@ -160,7 +160,7 @@ class RNN(nn.Module): # Implement a stacked vanilla RNN with Tanh nonlinearities
         x = self.dropout.forward(x)
         for j in range(self.num_layers):
             hidden_new[j] = self.step(x, hidden_new[j])
-            x = self.dropout.forward(hidden_new[j])
+            x = self.dropout.forward(x)
         
         output = torch.mm(hidden[-1], self.Wy) + self.by
         outputs = torch.cat([outputs, torch.unsqueeze(output, 0)])
@@ -214,7 +214,7 @@ class GRU(nn.Module): # Implement a stacked GRU RNN
     self.num_layers = num_layers
     self.dp_keep_prob = dp_keep_prob
     
-    self.wb = WordEmbedding(hidden_size, vocab_size)
+    self.wb = WordEmbedding(emb_size, vocab_size)
     self.dropout = nn.Dropout(1 - dp_keep_prob)
     self.linear = nn.Linear(hidden_size, vocab_size)
     
@@ -264,7 +264,7 @@ class GRU(nn.Module): # Implement a stacked GRU RNN
 #        print(x.shape)
         for j in range(self.num_layers):
             hidden_new[j] = self.step(x, hidden_new[j])
-            x = self.dropout.forward(hidden_new[j])
+            x = self.dropout.forward(x)
         
         output = torch.mm(hidden[-1], self.Wy) + self.by
         outputs = torch.cat([outputs, torch.unsqueeze(output, 0)])
