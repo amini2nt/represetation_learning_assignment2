@@ -225,6 +225,11 @@ class GRU(nn.Module): # Implement a stacked GRU RNN
     
     self.sigmoid = torch.nn.Sigmoid()
     self.tanh = torch.nn.Tanh()
+    if torch.cuda.is_available():
+        self.device = torch.device("cuda") 
+    else:
+        self.device = torch.device("cpu")
+
     
     self.init_weights_uniform()
 
@@ -232,19 +237,19 @@ class GRU(nn.Module): # Implement a stacked GRU RNN
     # TODO ========================
     k = math.sqrt(1/self.hidden_size)
     
-    self.Wr = torch.rand(self.emb_size, self.hidden_size) * 2 * k - k
-    self.Wz = torch.rand(self.emb_size, self.hidden_size) * 2 * k - k
-    self.Wh = torch.rand(self.emb_size, self.hidden_size) * 2 * k - k
-    self.Wy = torch.rand(self.hidden_size, self.vocab_size) * 2 * k - k
+    self.Wr = torch.rand(self.emb_size, self.hidden_size, device=self.device) * 2 * k - k
+    self.Wz = torch.rand(self.emb_size, self.hidden_size, device=self.device) * 2 * k - k
+    self.Wh = torch.rand(self.emb_size, self.hidden_size, device=self.device) * 2 * k - k
+    self.Wy = torch.rand(self.hidden_size, self.vocab_size, device=self.device) * 2 * k - k
     
-    self.Ur = torch.rand(self.hidden_size, self.hidden_size) * 2 * k - k
-    self.Uz = torch.rand(self.hidden_size, self.hidden_size) * 2 * k - k
-    self.Uh = torch.rand(self.hidden_size, self.hidden_size) * 2 * k - k
+    self.Ur = torch.rand(self.hidden_size, self.hidden_size, device=self.device) * 2 * k - k
+    self.Uz = torch.rand(self.hidden_size, self.hidden_size, device=self.device) * 2 * k - k
+    self.Uh = torch.rand(self.hidden_size, self.hidden_size, device=self.device) * 2 * k - k
     
-    self.br = torch.rand(1, self.hidden_size) * 2 * k - k
-    self.bz = torch.rand(1, self.hidden_size) * 2 * k - k
-    self.bh = torch.rand(1, self.hidden_size) * 2 * k - k
-    self.by = torch.rand(1, self.vocab_size) * 2 * k - k
+    self.br = torch.rand(1, self.hidden_size, device=self.device) * 2 * k - k
+    self.bz = torch.rand(1, self.hidden_size, device=self.device) * 2 * k - k
+    self.bh = torch.rand(1, self.hidden_size, device=self.device) * 2 * k - k
+    self.by = torch.rand(1, self.vocab_size, device=self.device) * 2 * k - k
 
   def init_hidden(self):
     # TODO ========================
