@@ -356,19 +356,32 @@ class MultiHeadedAttention(nn.Module):
         n_units: the number of output units
         dropout: probability of DROPPING units
         """
-        super(MultiHeadedAttention, self).__init__()
-        # This sets the size of the keys, values, and queries (self.d_k) to all 
-        # be equal to the number of output units divided by the number of heads.
-        self.d_k = n_units // n_heads
-        # This requires the number of n_heads to evenly divide n_units.
-        assert n_units % n_heads == 0
-        self.n_units = n_units 
-
         # TODO: create/initialize any necessary parameters or layers
         # Initialize all weights and biases uniformly in the range [-k, k],
         # where k is the square root of 1/n_units.
         # Note: the only Pytorch modules you are allowed to use are nn.Linear 
         # and nn.Dropout
+
+        self.n_heads = n_heads
+
+        super(MultiHeadedAttention, self).__init__()
+        # This sets the size of the keys, values, and queries (self.d_k) to all
+        # be equal to the number of output units divided by the number of heads.
+        self.d_k = n_units // self.n_heads
+        # This requires the number of n_heads to evenly divide n_units.
+        assert n_units % self.n_heads == 0
+        self.n_units = n_units # dmodel in the paper
+
+        self.k = [nn.Linear(n_units, self.d_k) for i in range(self.n_heads)]
+        self.v = [nn.Linear(n_units, self.d_k) for i in range(self.n_heads)]
+        self.q = [nn.Linear(n_units, self.d_k) for i in range(self.n_heads)]
+        self.W0 = nn.Linear(n_units, n_units)
+
+        self.dropout = nn.Dropout(dropout)
+        self.softmax = nn.Softmax(dim=-1)
+
+        self.log_debug = False
+        print(("Init MultiHeadedAttention n_units=%s, n_heads=%s, d_k=%s, dropout=%s" % (n_units, n_heads, self.d_k, dropout)))
         
     def forward(self, query, key, value, mask=None):
         # TODO: implement the masked multi-head attention.
@@ -378,8 +391,42 @@ class MultiHeadedAttention(nn.Module):
         # generating the "attention values" (i.e. A_i in the .tex)
         # Also apply dropout to the attention values.
 
-        return # size: (batch_size, seq_len, self.n_units)
+        batch_size, seq_len, u = query.size()
+        if self.log_debug:
+            print("query size: %s" % str(query.size()))
+            print("key size: %s" % str(key.size()))
+            print("value size: %s" % str(value.size()))
 
+            print("query size after MLP: %s" % str(self.q[0](query).size()))
+            print("key size after MLP: %s" % str(self.k[0](key).size()))
+            print("value size after MLP: %s" % str(self.v[0](value).size()))
+
+        heads = [self.attention(self.q[i](query), self.k[i](key), self.v[i](value), mask, self.d_k) for i in range(self.n_heads)]
+
+        if self.log_debug:
+            print("heads: %s" % str([heads[i].size() for i in range(self.n_heads)]))
+
+        concatenated = torch.cat(heads,2)
+        if self.log_debug:
+            print("concatenated size: %s" % str(concatenated.size()))
+
+        result = self.W0(concatenated)
+
+        return result # size: (batch_size, seq_len, self.n_units)
+
+    def attention(self, q, k, v, mask, d_k):
+        x = torch.bmm(q, k.transpose(1, 2)).to(q.dtype)
+        x = x / math.sqrt(d_k)
+
+        m = mask.to(q.dtype)
+        mask = mask.to(q.dtype)
+        negmask = 1 - mask
+        x = x * mask - (negmask * 10e9)
+
+        x =  self.softmax(x)
+        x = torch.bmm(x,v)
+        x = self.dropout(x)
+        return x
 
 
 
@@ -469,6 +516,7 @@ def make_model(vocab_size, n_blocks=6,
                n_units=512, n_heads=16, dropout=0.1):
     "Helper: Construct a model from hyperparameters."
     c = copy.deepcopy
+    print("make_model %s %s %s" % (n_heads, n_units, vocab_size))
     attn = MultiHeadedAttention(n_heads, n_units)
     ff = MLP(n_units, dropout)
     position = PositionalEncoding(n_units, dropout)
@@ -493,6 +541,8 @@ def subsequent_mask(size):
     """ helper function for creating the masks. """
     attn_shape = (1, size, size)
     subsequent_mask = np.triu(np.ones(attn_shape), k=1).astype('uint8')
+    print("subsequent_mask %s" % attn_shape)
+    print("subsequent_mask %s" % subsequent_mask)
     return torch.from_numpy(subsequent_mask) == 0
 
 class Batch:
