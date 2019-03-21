@@ -372,9 +372,10 @@ class MultiHeadedAttention(nn.Module):
         assert n_units % self.n_heads == 0
         self.n_units = n_units # dmodel in the paper
 
-        self.k = [nn.Linear(n_units, self.d_k) for i in range(self.n_heads)]
-        self.v = [nn.Linear(n_units, self.d_k) for i in range(self.n_heads)]
-        self.q = [nn.Linear(n_units, self.d_k) for i in range(self.n_heads)]
+        self.q_linear = nn.Linear(n_units, n_units)
+        self.v_linear = nn.Linear(n_units, n_units)
+        self.k_linear = nn.Linear(n_units, n_units)
+
         self.W0 = nn.Linear(n_units, n_units)
 
         self.dropout = nn.Dropout(dropout)
@@ -401,31 +402,32 @@ class MultiHeadedAttention(nn.Module):
             print("key size after MLP: %s" % str(self.k[0](key).size()))
             print("value size after MLP: %s" % str(self.v[0](value).size()))
 
-        heads = [self.attention(self.q[i](query), self.k[i](key), self.v[i](value), mask, self.d_k) for i in range(self.n_heads)]
+        k = self.k_linear(key).view(batch_size, -1, self.n_heads, self.d_k)
+        q = self.q_linear(query).view(batch_size, -1, self.n_heads, self.d_k)
+        v = self.v_linear(value).view(batch_size, -1, self.n_heads, self.d_k)
 
-        if self.log_debug:
-            print("heads: %s" % str([heads[i].size() for i in range(self.n_heads)]))
+        k = k.transpose(1,2)
+        q = q.transpose(1,2)
+        v = v.transpose(1,2)
 
-        concatenated = torch.cat(heads,2)
-        if self.log_debug:
-            print("concatenated size: %s" % str(concatenated.size()))
+        scores = self.attention(q, k, v, mask, self.d_k)
+
+        concatenated = scores.transpose(1,2).contiguous().view(batch_size, -1, self.n_units)
 
         result = self.W0(concatenated)
 
         return result # size: (batch_size, seq_len, self.n_units)
 
     def attention(self, q, k, v, mask, d_k):
-        x = torch.bmm(q, k.transpose(1, 2)).to(q.dtype)
+        x = torch.matmul(q, k.transpose(-2, -1)) /  math.sqrt(d_k)
         x = x / math.sqrt(d_k)
-
-        m = mask.to(q.dtype)
-        mask = mask.to(q.dtype)
-        negmask = 1 - mask
-        x = x * mask - (negmask * 10e9)
+        mask = mask.unsqueeze(1)
+        x = x.masked_fill(mask == 0, -1e9)
 
         x =  self.softmax(x)
-        x = torch.bmm(x,v)
         x = self.dropout(x)
+        x = torch.matmul(x, v)
+
         return x
 
 
